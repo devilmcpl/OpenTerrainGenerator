@@ -147,9 +147,9 @@ public abstract class OTGEngine
 
 				Enumeration<JarEntry> entries = jarFile.entries();
 				// Unpack default preset if none present
-				if (new File(presetsDir.getPath() + File.separator + "Default").exists())
+				if (new File(presetsDir.getPath() + File.separator + "DefaultPreset").exists())
 				{
-					File wc = new File(presetsDir.getPath() + File.separator+ "Default" + File.separator + Constants.PRESET_CONFIG_FILE);
+					File wc = new File(presetsDir.getPath() + File.separator+ "DefaultPreset" + File.separator + Constants.PRESET_CONFIG_FILE);
 					if (wc.exists())
 					{
 						BufferedReader reader = new BufferedReader(new FileReader(wc));
@@ -161,7 +161,7 @@ public abstract class OTGEngine
 						while (entries.hasMoreElements())
 						{
 							JarEntry jarEntry = entries.nextElement();
-							if (jarEntry.getName().contains("Default/" + Constants.PRESET_CONFIG_FILE))
+							if (jarEntry.getName().contains("DefaultPreset/" + Constants.PRESET_CONFIG_FILE))
 							{
 								reader = new BufferedReader(new BufferedReader(new InputStreamReader(jarFile.getInputStream(jarEntry))));
 								newMajorVer = parseMajorVersion(reader);
@@ -179,7 +179,7 @@ public abstract class OTGEngine
 				}
 	
 				String rootDir = getOTGRootFolder().toString();
-				String defaultPresetPath = "resources/Presets/Default/";
+				String defaultPresetPath = "resources/Presets/DefaultPreset/";
 				String dimensionConfigsPath = "resources/DimensionConfigs/";
 				entries = jarFile.entries();
 	
@@ -197,6 +197,8 @@ public abstract class OTGEngine
 						{
 							file.mkdirs();
 						} else {
+							// Directory entries aren't guaranteed to come before the files in them
+							file.getParentFile().mkdirs();
 							file.createNewFile();
 							FileOutputStream fos = new FileOutputStream(file);
 							byte[] byteArray = new byte[4096];
