@@ -8,6 +8,12 @@ website: https://github.com/PG85/OpenTerrainGenerator
 # OTG has to be enabled before worlds are loaded
 load: STARTUP
 api-version: '${minecraft_version}'
+dependencies:
+  server:
+    WorldEdit:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
   otg.cmd:
     description: Allows using the /otg commands

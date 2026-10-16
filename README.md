@@ -25,6 +25,7 @@ We're always looking for people to contribute or collaborate with. For OTG 1.20,
 - Put the OTG jar in the server's `plugins` folder.
 - To generate the server's worlds with an OTG preset, set `level-type=otg:<preset registry name>` (for instance `otg:default_preset`) in `server.properties` before the world is created.
 - Alternatively, set `generator: OpenTerrainGenerator:<preset>` for a world in `bukkit.yml`, or use `OpenTerrainGenerator:<preset>` as the generator in a world management plugin. Worlds set up this way keep the world height of their dimension instead of the preset's.
+- `/otg export` and `/otg edit` use the area selected with `/otg region`, or the WorldEdit selection if WorldEdit is installed.
 
 ### IntelliJ Building Instructions
 

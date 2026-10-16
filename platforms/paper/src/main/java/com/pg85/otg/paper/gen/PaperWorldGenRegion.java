@@ -60,10 +60,10 @@ import java.util.Random;
 
 public class PaperWorldGenRegion extends LocalWorldGenRegion {
     private final PresetConfig presetConfig;
-    private final OTGWorldInfo otgWorldInfo;
-    private final WorldGenLevel worldGenLevel;
-    private final OTGPaperChunkGenerator chunkGenerator;
-    private final int EMPTY;
+    protected final OTGWorldInfo otgWorldInfo;
+    protected final WorldGenLevel worldGenLevel;
+    protected final OTGPaperChunkGenerator chunkGenerator;
+    protected final int EMPTY;
 
 
     public PaperWorldGenRegion(
@@ -82,6 +82,33 @@ public class PaperWorldGenRegion extends LocalWorldGenRegion {
             chunkAccess.getPos().x,
             chunkAccess.getPos().z,
             chunkGenerator.getInternalGenerator().getCachedBiomeProvider()
+        );
+        this.presetConfig = presetConfig;
+        this.otgWorldInfo = otgWorldInfo;
+        this.worldGenLevel = worldGenLevel;
+        this.chunkGenerator = chunkGenerator;
+        this.EMPTY = otgWorldInfo.getEmptyChunkIndex();
+    }
+
+    /** Creates a region for use outside of decoration, see PaperLevelRegion. The chunk generator may be null for non-OTG worlds. */
+    protected PaperWorldGenRegion(
+            String presetFolderName,
+            IPluginConfig pluginConfig,
+            PresetConfig presetConfig,
+            OTGWorldInfo otgWorldInfo,
+            WorldGenLevel worldGenLevel,
+            int chunkX,
+            int chunkZ,
+            OTGPaperChunkGenerator chunkGenerator,
+            ICachedBiomeProvider cachedBiomeProvider
+    ) {
+        super(
+            presetFolderName,
+            pluginConfig,
+            presetConfig,
+            chunkX,
+            chunkZ,
+            cachedBiomeProvider
         );
         this.presetConfig = presetConfig;
         this.otgWorldInfo = otgWorldInfo;

@@ -16,6 +16,16 @@ public final class OTGCommand {
                 .then(PresetCommand.register())
                 .then(SettingsCommand.register())
                 .then(PackCommand.register())
+                .then(RegionCommand.register())
+                .then(ExportCommand.register())
+                .then(ConfigExportCommand.register())
+                .then(EditCommand.register())
+                .then(EditCommand.registerFinish())
+                .then(EditCommand.registerCancel())
+                .then(SpawnCommand.register())
+                .then(StructureCommand.register())
+                .then(FlushCommand.register())
+                .then(DataCommand.register())
                 .build();
         // Paper's command source is implemented by the vanilla CommandSourceStack, so the vanilla command tree can be
         // registered as is. Only Brigadier's own argument types are used, which Paper accepts.

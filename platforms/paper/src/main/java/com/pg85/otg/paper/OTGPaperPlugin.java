@@ -3,8 +3,10 @@ package com.pg85.otg.paper;
 import com.pg85.otg.OTG;
 import com.pg85.otg.paper.commands.OTGCommand;
 import com.pg85.otg.paper.events.PaperWorldListener;
+import com.pg85.otg.paper.events.SaplingHandler;
 import com.pg85.otg.paper.gen.OTGPaperChunkGenerator;
 import com.pg85.otg.paper.gen.PaperBukkitGeneratorStub;
+import com.pg85.otg.paper.networking.BiomeSyncListener;
 import com.pg85.otg.presets.Preset;
 import com.pg85.otg.util.OTGLog;
 import com.pg85.otg.util.logging.LogCategory;
@@ -20,7 +22,10 @@ import org.jetbrains.annotations.Nullable;
 public class OTGPaperPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
-        getServer().getPluginManager().registerEvents(new PaperWorldListener(), this);
+        getServer().getPluginManager().registerEvents(new PaperWorldListener(this), this);
+        getServer().getPluginManager().registerEvents(new SaplingHandler(), this);
+        getServer().getPluginManager().registerEvents(new BiomeSyncListener(this), this);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, BiomeSyncListener.CHANNEL);
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> OTGCommand.register(event.registrar()));
     }
 

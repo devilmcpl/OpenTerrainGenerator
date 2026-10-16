@@ -5,6 +5,7 @@ import com.pg85.otg.paper.gen.OTGPaperChunkGenerator;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,6 +24,16 @@ final class CommandHelper {
             return false;
         }
         return true;
+    }
+
+    /** Sends a failure message and returns null if the command wasn't run by a player. */
+    @Nullable
+    static ServerPlayer requirePlayer(CommandSourceStack src) {
+        ServerPlayer player = src.getPlayer();
+        if (player == null) {
+            src.sendFailure(Component.literal("Only players can execute this command"));
+        }
+        return player;
     }
 
     private CommandHelper() {}

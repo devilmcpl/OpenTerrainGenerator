@@ -8,6 +8,7 @@ plugins {
 
 repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://maven.enginehub.org/repo/")
 }
 
 val otg: Configuration by configurations.creating
@@ -21,6 +22,9 @@ dependencies {
     paperweight.paperDevBundle(project.property("paper_dev_bundle").toString())
 
     otg(project(":common:common-core"))
+
+    // Optional, used for selecting regions for /otg export and /otg edit
+    compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.4.2")
 }
 
 // Paper runs Mojang mapped since 1.20.5, so we ship the Mojang mapped jar as is
