@@ -9,8 +9,9 @@ import com.pg85.otg.util.logging.LogCategory;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.random.Weighted;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
@@ -102,7 +103,7 @@ public class MobInheritanceHandler {
     }
 
     private MobSettings getVanillaMobSettings(BiomeConfig biomeConfig, String parentName) {
-        Optional<Biome> optionalParent = biomeRegistry.getOptional(ResourceKey.create(Registries.BIOME, new ResourceLocation(parentName.toLowerCase(Locale.ROOT))));
+        Optional<Biome> optionalParent = biomeRegistry.getOptional(ResourceKey.create(Registries.BIOME, Identifier.parse(parentName.toLowerCase(Locale.ROOT))));
         if (optionalParent.isPresent()) {
             MobSettings.MobSettingsBuilder builder = MobSettings.builder();
             Biome parent = optionalParent.get();
@@ -134,14 +135,14 @@ public class MobInheritanceHandler {
         return null;
     }
 
-    private List<WeightedMobSpawnGroup> mapToMobSpawnGroup(List<MobSpawnSettings.SpawnerData> spawnerData) {
+    private List<WeightedMobSpawnGroup> mapToMobSpawnGroup(List<Weighted<MobSpawnSettings.SpawnerData>> spawnerData) {
         List<WeightedMobSpawnGroup> mobSpawnGroups = new ArrayList<>();
-        for (MobSpawnSettings.SpawnerData data : spawnerData) {
+        for (Weighted<MobSpawnSettings.SpawnerData> data : spawnerData) {
             mobSpawnGroups.add(new WeightedMobSpawnGroup(
-                    BuiltInRegistries.ENTITY_TYPE.getKey(data.type).toString(),
-                    data.getWeight().asInt(),
-                    data.minCount,
-                    data.maxCount));
+                    BuiltInRegistries.ENTITY_TYPE.getKey(data.value().type()).toString(),
+                    data.weight(),
+                    data.value().minCount(),
+                    data.value().maxCount()));
         }
         return mobSpawnGroups;
     }

@@ -5,7 +5,7 @@ import com.pg85.otg.fabric.biome.OTGFabricBiomeProvider;
 import com.pg85.otg.fabric.gen.OTGFabricChunkGenerator;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class BuiltInRegistriesMixin {
     @Inject(method = "<clinit>", at = @At("RETURN"))
     private static void registerGeneratorAndBiomeSource(CallbackInfo ci) {
-        Registry.register(BuiltInRegistries.BIOME_SOURCE, new ResourceLocation(Constants.MOD_ID_SHORT, Constants.MOD_ID_SHORT), OTGFabricBiomeProvider.CODEC);
-        Registry.register(BuiltInRegistries.CHUNK_GENERATOR, new ResourceLocation(Constants.MOD_ID_SHORT, Constants.MOD_ID_SHORT), OTGFabricChunkGenerator.CODEC);
+        Registry.register(BuiltInRegistries.BIOME_SOURCE, Identifier.fromNamespaceAndPath(Constants.MOD_ID_SHORT, Constants.MOD_ID_SHORT), OTGFabricBiomeProvider.CODEC);
+        Registry.register(BuiltInRegistries.CHUNK_GENERATOR, Identifier.fromNamespaceAndPath(Constants.MOD_ID_SHORT, Constants.MOD_ID_SHORT), OTGFabricChunkGenerator.CODEC);
     }
 }

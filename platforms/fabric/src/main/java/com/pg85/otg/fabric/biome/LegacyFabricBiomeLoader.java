@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.Map.Entry;
 
-import com.mojang.serialization.Lifecycle;
 import com.pg85.otg.OTG;
 import com.pg85.otg.config.ConfigFunction;
 import com.pg85.otg.config.biome.BiomeConfig;
@@ -31,15 +30,23 @@ import com.pg85.otg.util.logging.LogLevel;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.core.RegistrationInfo;
 import net.minecraft.core.Registry;
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.Music;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.minecraft.world.attribute.AmbientAdditionsSettings;
+import net.minecraft.world.attribute.AmbientMoodSettings;
+import net.minecraft.world.attribute.AmbientSounds;
+import net.minecraft.world.attribute.BackgroundMusic;
+import net.minecraft.world.attribute.EnvironmentAttributeMap;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.*;
@@ -141,7 +148,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
     {
         if (!BIOME_DATA_INITIALIZED) {
             // Should always be initialized, but better safe than sorry. Would rather have a sensical error message than nonsensical
-            throw new IllegalStateException("BiomeDataMixin not initialized");
+            throw new IllegalStateException("Placed feature and carver registries not initialized");
         }
         HolderGetter<PlacedFeature> featureHolder = PLACED_FEATURE_HOLDER;
         HolderGetter<ConfiguredWorldCarver<?>> carverHolder = CONFIGURED_CARVER_HOLDER;
@@ -226,7 +233,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
 
             // When using TemplateForBiome, we'll fetch the non-OTG biome from the registry, including any settings registered to it.
             // For normal biomes we create our own new OTG biome and apply settings from the biome config.
-            ResourceLocation resourceLocation = new ResourceLocation(iBiomeResourceLocation.toResourceLocationString());
+            Identifier resourceLocation = Identifier.parse(iBiomeResourceLocation.toResourceLocationString());
             ResourceKey<Biome> resourceKey;
             Biome biome;
             Holder.Reference<Biome> ref;
@@ -234,7 +241,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
             if(
                 biomeConfig.getIdentitySettings().isTemplateForBiome()
             ) {
-                biome = biomeRegistry.get(resourceLocation);
+                biome = biomeRegistry.getValue(resourceLocation);
                 if (biome == null) {
                     if(OTG.getEngine().getLogger().getLogCategoryEnabled(LogCategory.BIOME_REGISTRY))
                     {
@@ -251,7 +258,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
                     }
                     continue;
                 }
-                ref = biomeRegistry.getHolder(resourceKey).orElseThrow();
+                ref = biomeRegistry.get(resourceKey).orElseThrow();
 
             } else {
                 if(!(iBiomeResourceLocation instanceof OTGBiomeResourceLocation))
@@ -267,7 +274,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
 
                 biome = LegacyFabricBiomeLoader.createOTGBiome(preset.getPresetConfig(), biomeConfig, featureHolder, carverHolder);
 
-                ref = biomeRegistry.register(resourceKey, biome, Lifecycle.stable());
+                ref = biomeRegistry.register(resourceKey, biome, RegistrationInfo.BUILT_IN);
             }
             presetBiomes.add(resourceKey);
 
@@ -390,7 +397,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
             if (res instanceof RegistryResource registryResource)
             {
                 GenerationStep.Decoration stage = GenerationStep.Decoration.valueOf(registryResource.getDecorationStage());
-                Optional<Holder.Reference<PlacedFeature>> placedFeatureReference = featureHolderGetter.get(ResourceKey.create(Registries.PLACED_FEATURE, new ResourceLocation(registryResource.getFeatureKey())));
+                Optional<Holder.Reference<PlacedFeature>> placedFeatureReference = featureHolderGetter.get(ResourceKey.create(Registries.PLACED_FEATURE, Identifier.parse(registryResource.getFeatureKey())));
                 if(
                         placedFeatureReference.isPresent()
                         && placedFeatureReference.get().isBound()
@@ -414,18 +421,20 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
         
         float downfall = biomeConfig.getVisualSettings().getBiomeWetness();
 
-        BiomeSpecialEffects.Builder specialEffects = getSpecialEffects(presetConfig, biomeConfig);
+        BiomeSpecialEffects.Builder specialEffects = getSpecialEffects(biomeConfig);
 
         return new Biome.BiomeBuilder()
                 .generationSettings(generationSettings.build())
                 .mobSpawnSettings(mobSpawnSettings.build())
                 .specialEffects(specialEffects.build())
+                .putAttributes(getEnvironmentAttributes(presetConfig, biomeConfig))
                 .downfall(downfall)
                 .temperature(temperature)
                 .build();
     }
 
-    private static BiomeSpecialEffects.Builder getSpecialEffects(PresetSettings presetConfig, BiomeSettings biomeConfig) {
+    // Fog, sky, music and ambient sounds are environment attributes now, anything not set here falls back to the dimension
+    private static EnvironmentAttributeMap.Builder getEnvironmentAttributes(PresetSettings presetConfig, BiomeSettings biomeConfig) {
         BiomeVisualSettings biomeVisualSettings = biomeConfig.getVisualSettings();
         float safeTemperature = biomeConfig.getVisualSettings().getBiomeTemperature();
         if (safeTemperature >= 0.1 && safeTemperature <= 0.2)
@@ -434,52 +443,50 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
             safeTemperature = safeTemperature >= 1.5 ? 0.2f : 0.1f;
         }
 
-        BiomeSpecialEffects.Builder specialEffects =
-                new BiomeSpecialEffects.Builder()
-                        .fogColor(
+        EnvironmentAttributeMap.Builder attributes =
+                EnvironmentAttributeMap.builder()
+                        .set(EnvironmentAttributes.FOG_COLOR, ARGB.opaque(
                                 (!Objects.equals(biomeVisualSettings.getFogColor(), BiomeVisualSettings.FOG_COLOR.getDefaultValue())
                                         ? biomeVisualSettings.getFogColor()
                                         : presetConfig.getVisualSettings().getFogColor()
                                 ).intValue()
-                        )
-                        .waterFogColor(
+                        ))
+                        .set(EnvironmentAttributes.WATER_FOG_COLOR, ARGB.opaque(
                                 !Objects.equals(biomeVisualSettings.getWaterFogColor(), BiomeVisualSettings.WATER_FOG_COLOR.getDefaultValue())
                                         ? biomeVisualSettings.getWaterFogColor().intValue()
                                         : 329011
-                        )
-                        .waterColor(
-                                !Objects.equals(biomeVisualSettings.getWaterColor(), BiomeVisualSettings.WATER_COLOR.getDefaultValue())
-                                        ? biomeVisualSettings.getWaterColor().intValue()
-                                        : 4159204
-                        )
-                        .skyColor(
+                        ))
+                        .set(EnvironmentAttributes.SKY_COLOR, ARGB.opaque(
                                 !Objects.equals(biomeVisualSettings.getSkyColor(), BiomeVisualSettings.SKY_COLOR.getDefaultValue())
                                         ? biomeVisualSettings.getSkyColor().intValue()
                                         : getSkyColorForTemp(safeTemperature)
-                        ) // TODO: Sky color is normally based on temp, make a setting for that?
+                        )) // TODO: Sky color is normally based on temp, make a setting for that?
                 ;
         //Optional<Holder.Reference<ParticleType<?>>> ambientParticle = getFromRegistry(BuiltInRegistries.PARTICLE_TYPE, Registries.PARTICLE_TYPE, biomeVisualSettings.getParticleType());
         // TODO: Particles have become incredibly tricky to work with, let's avoid this for now
 
-        Optional<Holder.Reference<SoundEvent>> ambientLoopSoundEvent = getFromRegistry(BuiltInRegistries.SOUND_EVENT, Registries.SOUND_EVENT, biomeVisualSettings.getAmbientSound());
-        ambientLoopSoundEvent.ifPresent(specialEffects::ambientLoopSound);
+        Optional<Holder<SoundEvent>> ambientLoopSoundEvent = getFromRegistry(BuiltInRegistries.SOUND_EVENT, Registries.SOUND_EVENT, biomeVisualSettings.getAmbientSound()).map(holder -> holder);
+        Optional<AmbientMoodSettings> ambientMoodSettings = Optional.empty();
         Optional<Holder.Reference<SoundEvent>> ambientMoodSound = getFromRegistry(BuiltInRegistries.SOUND_EVENT, Registries.SOUND_EVENT, biomeVisualSettings.getMoodSound());
         if (ambientMoodSound.isPresent()) {
-            AmbientMoodSettings ambientMoodSettings = new AmbientMoodSettings(
+            ambientMoodSettings = Optional.of(new AmbientMoodSettings(
                     ambientMoodSound.get(),
                     biomeVisualSettings.getMoodSoundDelay(),
                     biomeVisualSettings.getMoodSearchRange(),
                     biomeVisualSettings.getMoodOffset()
-            );
-            specialEffects.ambientMoodSound(ambientMoodSettings);
+            ));
         }
+        List<AmbientAdditionsSettings> ambientAdditionsSettings = new ArrayList<>();
         Optional<Holder.Reference<SoundEvent>> ambientAdditionsSound = getFromRegistry(BuiltInRegistries.SOUND_EVENT, Registries.SOUND_EVENT, biomeVisualSettings.getAdditionsSound());
         if (ambientAdditionsSound.isPresent()) {
-            AmbientAdditionsSettings ambientAdditionsSettings = new AmbientAdditionsSettings(
+            ambientAdditionsSettings.add(new AmbientAdditionsSettings(
                     ambientAdditionsSound.get(),
                     biomeVisualSettings.getAdditionsTickChance()
-            );
-            specialEffects.ambientAdditionsSound(ambientAdditionsSettings);
+            ));
+        }
+        // Only override the ambient sounds if any are configured, so the dimension's cave sounds still apply otherwise
+        if (ambientLoopSoundEvent.isPresent() || ambientMoodSettings.isPresent() || !ambientAdditionsSettings.isEmpty()) {
+            attributes.set(EnvironmentAttributes.AMBIENT_SOUNDS, new AmbientSounds(ambientLoopSoundEvent, ambientMoodSettings, ambientAdditionsSettings));
         }
         Optional<Holder.Reference<SoundEvent>> backgroundMusic = getFromRegistry(BuiltInRegistries.SOUND_EVENT, Registries.SOUND_EVENT, biomeVisualSettings.getMusic());
         if (backgroundMusic.isPresent()) {
@@ -489,8 +496,22 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
                     biomeVisualSettings.getMusicMaxDelay(),
                     biomeVisualSettings.isReplaceCurrentMusic()
             );
-            specialEffects.backgroundMusic(music);
+            attributes.set(EnvironmentAttributes.BACKGROUND_MUSIC, new BackgroundMusic(music));
         }
+
+        return attributes;
+    }
+
+    private static BiomeSpecialEffects.Builder getSpecialEffects(BiomeSettings biomeConfig) {
+        BiomeVisualSettings biomeVisualSettings = biomeConfig.getVisualSettings();
+
+        BiomeSpecialEffects.Builder specialEffects =
+                new BiomeSpecialEffects.Builder()
+                        .waterColor(
+                                !Objects.equals(biomeVisualSettings.getWaterColor(), BiomeVisualSettings.WATER_COLOR.getDefaultValue())
+                                        ? biomeVisualSettings.getWaterColor().intValue()
+                                        : 4159204
+                        );
 
         if(biomeVisualSettings.getFoliageColor().intValue() != 0xffffff) {
             specialEffects.foliageColorOverride(biomeVisualSettings.getFoliageColor().intValue());
@@ -516,7 +537,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
 
     private static <T> Optional<Holder.Reference<T>> getFromRegistry(Registry<T> registry, ResourceKey<Registry<T>> registryResourceKey, String locationString) {
         try {
-            return registry.getHolder(ResourceKey.create(registryResourceKey, new ResourceLocation(locationString)));
+            return registry.get(ResourceKey.create(registryResourceKey, Identifier.parse(locationString)));
         } catch (Exception e) {
             OTGLog.error(CONFIGS, "Could not find registry entry for '" + locationString + "'");
             return Optional.empty();
@@ -545,7 +566,7 @@ public class LegacyFabricBiomeLoader extends LocalPresetLoader {
             Optional<EntityType<?>> entityType = EntityType.byString(mobSpawnGroup.internalName());
             if(entityType.isPresent())
             {
-                mobSpawnInfoBuilder.addSpawn(entitiClassification, new MobSpawnSettings.SpawnerData(entityType.get(), mobSpawnGroup.getWeight(), mobSpawnGroup.getMin(), mobSpawnGroup.getMax()));
+                mobSpawnInfoBuilder.addSpawn(entitiClassification, mobSpawnGroup.getWeight(), new MobSpawnSettings.SpawnerData(entityType.get(), mobSpawnGroup.getMin(), mobSpawnGroup.getMax()));
             } else {
                 if(OTG.getEngine().getLogger().getLogCategoryEnabled(LogCategory.MOBS))
                 {

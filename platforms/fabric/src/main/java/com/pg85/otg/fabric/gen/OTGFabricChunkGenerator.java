@@ -1,7 +1,6 @@
 package com.pg85.otg.fabric.gen;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.Lifecycle;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.pg85.otg.OTG;
 import com.pg85.otg.constants.Constants;
@@ -27,6 +26,8 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.Getter;
 import net.minecraft.core.*;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.*;
@@ -44,12 +45,11 @@ import net.minecraft.world.level.levelgen.structure.*;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
 import net.minecraft.world.level.storage.LevelResource;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Predicate;
 
 @Getter
@@ -62,19 +62,19 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
         return super.createState(structureSetLookup, randomState, seed);
     }
 
-    public static final Codec<OTGFabricChunkGenerator> CODEC =
-            RecordCodecBuilder.create(instance ->
+    public static final MapCodec<OTGFabricChunkGenerator> CODEC =
+            RecordCodecBuilder.mapCodec(instance ->
                     instance.group(
                             OTGFabricBiomeProvider.CODEC.fieldOf("biome_source").forGetter(OTGFabricChunkGenerator::getBiomeSource),
                             NoiseGeneratorSettings.CODEC.fieldOf("settings").forGetter(OTGFabricChunkGenerator::getSettings),
-                            RegistryCodecs.fullCodec(Registries.BIOME, Lifecycle.stable(), Biome.DIRECT_CODEC).fieldOf("biomeRegistry").forGetter(OTGFabricChunkGenerator::getBiomeRegistry)
+                            RegistryOps.retrieveGetter(Registries.BIOME)
                     ).apply(instance, instance.stable(OTGFabricChunkGenerator::new)));
 
     private final Holder<NoiseGeneratorSettings> settings;
     private final OTGFabricBiomeProvider biomeSource;
     private final OTGChunkGenerator internalGenerator;
     private final Preset preset;
-    private final Registry<Biome> biomeRegistry;
+    private final HolderGetter<Biome> biomeRegistry;
     private final NoiseBasedChunkGenerator horribleDelegateForCarvers;
     private final ShadowChunkGenerator shadowChunkGenerator;
     private Aquifer.FluidPicker globalFluidPicker = null;
@@ -87,7 +87,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
     private final OTGWorldInfo otgWorldInfo;
 
     public OTGFabricChunkGenerator(
-            OTGFabricBiomeProvider biomeSource, Holder<NoiseGeneratorSettings> settings, Registry<Biome> biomeHolderGetter
+            OTGFabricBiomeProvider biomeSource, Holder<NoiseGeneratorSettings> settings, HolderGetter<Biome> biomeHolderGetter
     ) {
         super(biomeSource);
         this.settings = settings;
@@ -187,9 +187,10 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
             ChunkGeneratorStructureState chunkGeneratorStructureState,
             StructureManager structureManager,
             ChunkAccess chunkAccess,
-            StructureTemplateManager structureTemplateManager
+            StructureTemplateManager structureTemplateManager,
+            ResourceKey<Level> levelKey
     ) {
-        super.createStructures(registryAccess, chunkGeneratorStructureState, structureManager, chunkAccess, structureTemplateManager);
+        super.createStructures(registryAccess, chunkGeneratorStructureState, structureManager, chunkAccess, structureTemplateManager, levelKey);
     }
 
     @Override
@@ -218,14 +219,14 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
     }
 
     @Override
-    protected Codec<? extends ChunkGenerator> codec() {
+    protected MapCodec<? extends ChunkGenerator> codec() {
         return CODEC;
     }
 
     @Override
-    public void applyCarvers(WorldGenRegion worldGenRegion, long seed, RandomState randomState, BiomeManager biomeManager, StructureManager structureManager, ChunkAccess chunkAccess, GenerationStep.Carving carving) {
+    public void applyCarvers(WorldGenRegion worldGenRegion, long seed, RandomState randomState, BiomeManager biomeManager, StructureManager structureManager, ChunkAccess chunkAccess) {
 
-        handleOTGCarvers(seed, chunkAccess, carving);
+        handleOTGCarvers(seed, chunkAccess);
 
         //applyNonOTGCarvers(seed, biomeManager, chunkAccess, carving);
 
@@ -236,7 +237,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
         int i2 = 8;
         ChunkPos chunkPos = chunkAccess.getPos();
         NoiseChunk noiseChunk = chunkAccess.getOrCreateNoiseChunk(chunkAccess2 -> this.createNoiseChunk(chunkAccess2, structureManager, Blender.of(worldGenRegion), randomState, worldGenRegion.registryAccess()));
-        CarvingMask carvingMask = ((ProtoChunk) chunkAccess).getOrCreateCarvingMask(carving);
+        CarvingMask carvingMask = ((ProtoChunk) chunkAccess).getOrCreateCarvingMask();
         Aquifer aquifer = noiseChunk.aquifer();
         CarvingContext carvingContext = new CarvingContext(this.horribleDelegateForCarvers, worldGenRegion.registryAccess(), chunkAccess.getHeightAccessorForGeneration(), noiseChunk, randomState, this.settings.value().surfaceRule());
         for (int j2 = -8; j2 <= 8; ++j2) {
@@ -244,7 +245,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
                 ChunkPos chunkPos2 = new ChunkPos(chunkPos.x + j2, chunkPos.z + k2);
                 ChunkAccess chunkAccess22 = worldGenRegion.getChunk(chunkPos2.x, chunkPos2.z);
                 BiomeGenerationSettings biomeGenerationSettings = chunkAccess22.carverBiome(() -> this.getBiomeGenerationSettings(this.biomeSource.getNoiseBiome(QuartPos.fromBlock(chunkPos2.getMinBlockX()), 0, QuartPos.fromBlock(chunkPos2.getMinBlockZ()), randomState.sampler())));
-                Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomeGenerationSettings.getCarvers(carving);
+                Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomeGenerationSettings.getCarvers();
                 int m = 0;
                 for (Holder<ConfiguredWorldCarver<?>> carver : iterable) {
                     if (defaultCavesAndRavines.stream().noneMatch(
@@ -263,10 +264,10 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
         }
     }
 
-    private void handleOTGCarvers(long seed, ChunkAccess chunkAccess, GenerationStep.Carving carving) {
+    private void handleOTGCarvers(long seed, ChunkAccess chunkAccess) {
         FabricBiome biome = (FabricBiome) this.internalGenerator.getCachedBiomeProvider().getNoiseBiome(chunkAccess.getPos().x << 2, chunkAccess.getPos().z << 2);
         BiomeGenerationSettings biomegenerationsettings = biome.getBiome().getGenerationSettings();
-        Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomegenerationsettings.getCarvers(carving);
+        Iterable<Holder<ConfiguredWorldCarver<?>>> iterable = biomegenerationsettings.getCarvers();
 
         // Only use OTG carvers when default mc carvers are found
         List<String> defaultCaves = Arrays.asList("minecraft:cave", "minecraft:underwater_cave", "minecraft:nether_cave");
@@ -302,7 +303,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
         }
 
         ChunkBuffer chunkBuffer = new FabricChunkBuffer(chunkAccess);
-        CarvingMask carvingMask = ((ProtoChunk) chunkAccess).getOrCreateCarvingMask(carving);
+        CarvingMask carvingMask = ((ProtoChunk) chunkAccess).getOrCreateCarvingMask();
         BitSet bitSet = BitSet.valueOf(carvingMask.toArray());
         internalGenerator.carve(
                 chunkBuffer,
@@ -365,7 +366,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
 
     @Override
     public CompletableFuture<ChunkAccess> fillFromNoise(
-            Executor executor, Blender blender, RandomState randomState, StructureManager structureManager,
+            Blender blender, RandomState randomState, StructureManager structureManager,
             ChunkAccess chunkAccess
     ) {
         ChunkCoordinate chunkCoord = ChunkCoordinate.fromChunkCoords(chunkAccess.getPos().x, chunkAccess.getPos().z);
@@ -455,7 +456,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
     public NoiseColumn getBaseColumn(int i, int j, LevelHeightAccessor levelHeightAccessor, RandomState randomState) {
         BlockState[] blockStates = new BlockState[levelHeightAccessor.getHeight()];
         this.sampleHeightmap(i, j, blockStates, null);
-        return new NoiseColumn(levelHeightAccessor.getMinBuildHeight(), blockStates);
+        return new NoiseColumn(levelHeightAccessor.getMinY(), blockStates);
     }
 
     @Override

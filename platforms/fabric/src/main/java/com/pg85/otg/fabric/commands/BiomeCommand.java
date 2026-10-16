@@ -34,7 +34,7 @@ final class BiomeCommand {
         BlockPos pos = BlockPos.containing(src.getPosition());
 
         String mcBiomeName = level.getBiome(pos).unwrapKey()
-            .map(k -> k.location().toString())
+            .map(k -> k.identifier().toString())
             .orElse("unknown");
 
         ICachedBiomeProvider provider = gen.getInternalGenerator().getCachedBiomeProvider();

@@ -32,7 +32,7 @@ dependencies {
 }
 
 loom {
-    //accessWidenerPath = file("src/main/resources/META-INF/otg.accesswidener")
+    accessWidenerPath = file("src/main/resources/META-INF/otg.accesswidener")
 }
 
 tasks {
@@ -53,7 +53,7 @@ tasks {
 
     shadowJar {
         exclude("architectury.common.json")
-        configurations = listOf(otg)
+        configurations.set(listOf(otg))
         archiveClassifier.set("deobf-all")
     }
 

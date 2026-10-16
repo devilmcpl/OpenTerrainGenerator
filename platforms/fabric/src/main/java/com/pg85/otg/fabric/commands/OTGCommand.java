@@ -12,7 +12,7 @@ public final class OTGCommand {
                                 Commands.CommandSelection selection) {
         dispatcher.register(
             Commands.literal("otg")
-                .requires(src -> src.hasPermission(2))
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(BiomeCommand.register())
                 .then(TpCommand.register())
                 .then(MapCommand.register())

@@ -1,6 +1,6 @@
 ##  OpenTerrainGenerator by Team OTG
 
-OpenTerrainGenerator for MC 1.20.x is under development, alpha builds are available in the dev-releases channel of the OTG Discord.
+OpenTerrainGenerator for MC 1.21.x is under development, alpha builds are available in the dev-releases channel of the OTG Discord.
 
 
 

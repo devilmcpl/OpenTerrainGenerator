@@ -22,6 +22,7 @@ import com.pg85.otg.util.minecraft.TreeType;
 import com.pg85.otg.util.nbt.NamedBinaryTag;
 import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.features.CaveFeatures;
 import net.minecraft.data.worldgen.features.EndFeatures;
@@ -30,6 +31,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.chat.Component;
+import net.minecraft.tags.EntityTypeTags;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.monster.Guardian;
 import net.minecraft.world.entity.monster.Monster;
@@ -40,11 +43,12 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.FeatureConfiguration;
+import net.minecraft.world.level.storage.TagValueInput;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -103,7 +107,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                 this.getPresetConfig().getSpawnSettings().getSpawnPointZ()
             );
         } else {
-            BlockPos spawnPos = this.worldGenLevel.getLevel().getSharedSpawnPos();
+            BlockPos spawnPos = this.worldGenLevel.getLevel().getRespawnData().pos();
             return ChunkCoordinate.fromBlockCoords(spawnPos.getX(), spawnPos.getZ());
         }
     }
@@ -140,7 +144,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
         }
         BlockPos pos = new BlockPos(x, y, z);
 
-        var r = worldGenLevel.getLevel().registryAccess().registry(Registries.CONFIGURED_FEATURE);
+        var r = worldGenLevel.getLevel().registryAccess().lookup(Registries.CONFIGURED_FEATURE);
         if (r.isEmpty()) {
             OTGLog.fatal("Failed to get registry for configured features.");
             return true; // keep it from trying again
@@ -366,7 +370,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
         int chunkZ = z >> 4;
 
         // Check if the chunk has been lit, otherwise cancel.
-        if (worldGenLevel.getChunk(chunkX, chunkZ).getStatus().isOrAfter(ChunkStatus.LIGHT)) {
+        if (worldGenLevel.getChunk(chunkX, chunkZ).getPersistedStatus().isOrAfter(ChunkStatus.LIGHT)) {
             // Get the light level of the block state? Different from old behaviour
             // TODO: Check that this does not break in 1.20
             return this.worldGenLevel.getLightEmission(new BlockPos(x, y, z));
@@ -449,7 +453,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
 
         BlockEntity tileEntity = this.worldGenLevel.getBlockEntity(new BlockPos(x, y, z));
         if (tileEntity != null) {
-            tileEntity.load(nms);
+            tileEntity.loadWithComponents(TagValueInput.create(ProblemReporter.DISCARDING, this.worldGenLevel.registryAccess(), nms));
         } else {
             if (OTGLog.getLogCategoryEnabled(LogCategory.CUSTOM_OBJECTS)) {
                 OTGLog.log(
@@ -457,7 +461,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                     LogCategory.CUSTOM_OBJECTS,
                     MessageFormat.format(
                         "Skipping tile entity with id {0}, cannot be placed at {1},{2},{3}",
-                        nms.getString("id"),
+                        nms.getStringOr("id", ""),
                         x, y, z
                     )
                 );
@@ -467,6 +471,10 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
 
     public BlockEntity getBlockEntity(BlockPos blockPos) {
         return this.worldGenLevel.getBlockEntity(blockPos);
+    }
+
+    public RegistryAccess getRegistryAccess() {
+        return this.worldGenLevel.registryAccess();
     }
 
     @Override
@@ -544,7 +552,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
         if (nbtTagCompound == null) {
             // Create entity without nbt data
             try {
-                entity = type2.create(worldGenLevel.getLevel());
+                entity = type2.create(worldGenLevel.getLevel(), EntitySpawnReason.CHUNK_GENERATION);
             } catch (Exception exception) {
                 if (OTGLog.getLogger().getLogCategoryEnabled(LogCategory.CUSTOM_OBJECTS)) {
                     OTGLog.log(
@@ -568,7 +576,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                 }
                 return;
             } else {
-                entity.moveTo(
+                entity.snapTo(
                     entityData.getX(),
                     entityData.getY(),
                     entityData.getZ(),
@@ -580,9 +588,9 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
             // Create entity with nbt data
             try {
                 entity = EntityType.loadEntityRecursive(
-                    nbtTagCompound, this.worldGenLevel.getLevel(), (entity1) ->
+                    nbtTagCompound, this.worldGenLevel.getLevel(), EntitySpawnReason.CHUNK_GENERATION, (entity1) ->
                     {
-                        entity1.moveTo(
+                        entity1.snapTo(
                             entityData.getX(),
                             entityData.getY(),
                             entityData.getZ(),
@@ -611,14 +619,14 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                 if (nbtTagCompound == null) {
                     // Create entity without nbt data
                     try {
-                        entity = type2.create(this.worldGenLevel.getLevel());
+                        entity = type2.create(this.worldGenLevel.getLevel(), EntitySpawnReason.CHUNK_GENERATION);
                     } catch (Exception exception) {
                         return;
                     }
                     if (entity == null) {
                         return;
                     } else {
-                        entity.moveTo(
+                        entity.snapTo(
                             entityData.getX(),
                             entityData.getY(),
                             entityData.getZ(),
@@ -629,8 +637,8 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                 } else {
                     // Create entity with nbt data
                     entity = EntityType.loadEntityRecursive(
-                        nbtTagCompound, this.worldGenLevel.getLevel(), (entity1) -> {
-                            entity1.moveTo(
+                        nbtTagCompound, this.worldGenLevel.getLevel(), EntitySpawnReason.CHUNK_GENERATION, (entity1) -> {
+                            entity1.snapTo(
                                 entityData.getX(),
                                 entityData.getY(),
                                 entityData.getZ(),
@@ -658,7 +666,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                     block.isSolid() ||
                     (
                         (
-                            monster.getMobType() == MobType.WATER
+                            monster.getType().is(EntityTypeTags.AQUATIC)
                             || monster instanceof Guardian
                         )
                         && !block.isLiquid()
@@ -700,9 +708,8 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                             entityData.getY(),
                             (int) entityData.getZ()
                         )),
-                        MobSpawnType.CHUNK_GENERATION,
-                        null, // TODO: Missing functionality in EntityFunction
-                        nbtTagCompound
+                        EntitySpawnReason.CHUNK_GENERATION,
+                        null // TODO: Missing functionality in EntityFunction
                     );
                 this.worldGenLevel.addFreshEntity(monster);
             }
@@ -722,7 +729,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
 
     @Override
     public void placeFossil(Random random, int x, int y, int z) {
-        var r = worldGenLevel.getLevel().registryAccess().registry(Registries.CONFIGURED_FEATURE);
+        var r = worldGenLevel.getLevel().registryAccess().lookup(Registries.CONFIGURED_FEATURE);
         if (r.isPresent()) {
             var feature = r.get().getOptional(CaveFeatures.FOSSIL_COAL);
             feature.ifPresent(configuredFeature -> configuredFeature.place(
@@ -779,7 +786,7 @@ public class FabricWorldGenRegion extends LocalWorldGenRegion {
                 ? this.worldGenLevel.getChunk(pos.x, pos.z, ChunkStatus.CARVERS, false)
                 : null;
         }
-        if (chunk == null || !chunk.getStatus().isOrAfter(ChunkStatus.CARVERS)) {
+        if (chunk == null || !chunk.getPersistedStatus().isOrAfter(ChunkStatus.CARVERS)) {
             return this.chunkGenerator.getHighestBlockYInUnloadedChunk(
                 x,
                 z,

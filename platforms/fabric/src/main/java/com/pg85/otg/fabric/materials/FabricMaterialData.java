@@ -10,13 +10,13 @@ import lombok.NonNull;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.Property;
 
 import java.util.Collection;
@@ -33,8 +33,8 @@ public class FabricMaterialData extends LocalMaterialData {
     private static final ConcurrentHashMap<BlockState, FabricMaterialData> stateToMaterialDataMap = new ConcurrentHashMap<>();
 
     // OTG block tags for logs and leaves
-    private static final TagKey<Block> LOGS_TAG = TagKey.create(Registries.BLOCK, new ResourceLocation("otg", "log"));
-    private static final TagKey<Block> LEAVES_TAG = TagKey.create(Registries.BLOCK, new ResourceLocation("otg", "leaves"));
+    private static final TagKey<Block> LOGS_TAG = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("otg", "log"));
+    private static final TagKey<Block> LEAVES_TAG = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("otg", "leaves"));
 
     public FabricMaterialData(BlockState state, String raw) {
         super(raw);
@@ -91,7 +91,7 @@ public class FabricMaterialData extends LocalMaterialData {
         else if (materialProperty == MaterialProperties.HORIZONTAL_DIRECTION)
         {
             // Extremely ugly hack for directions
-            DirectionProperty directionProperty = BlockStateProperties.HORIZONTAL_FACING;
+            EnumProperty<Direction> directionProperty = BlockStateProperties.HORIZONTAL_FACING;
             Direction direction = Direction.values()[((OTGDirection)value).ordinal()];
             return FabricMaterialData.ofBlockState(this.state.setValue(directionProperty, direction));
         } else {
@@ -104,7 +104,7 @@ public class FabricMaterialData extends LocalMaterialData {
     public <T extends Comparable<T>> LocalMaterialData withProperty(String property, T value) {
         // Special case for OTGDirection because it's OTG specific, unlike Integer and Boolean
         if (value instanceof OTGDirection) {
-            DirectionProperty directionProperty = BlockStateProperties.HORIZONTAL_FACING;
+            EnumProperty<Direction> directionProperty = BlockStateProperties.HORIZONTAL_FACING;
             Direction direction = Direction.values()[((OTGDirection)value).ordinal()];
             return FabricMaterialData.ofBlockState(this.state.setValue(directionProperty, direction));
         }

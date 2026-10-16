@@ -2,6 +2,7 @@ package com.pg85.otg.fabric.biome;
 
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.pg85.otg.OTG;
 import com.pg85.otg.gen.biome.layers.BiomeLayers;
@@ -29,7 +30,7 @@ import java.util.stream.Stream;
 @Getter
 public class
 OTGFabricBiomeProvider extends BiomeSource implements ILayerSource, BiomeManager.NoiseBiomeSource {
-    public static final Codec<OTGFabricBiomeProvider> CODEC = RecordCodecBuilder.create(
+    public static final MapCodec<OTGFabricBiomeProvider> CODEC = RecordCodecBuilder.mapCodec(
             instance -> instance.group(
                     Codec.STRING.fieldOf("preset_name").stable().forGetter(OTGFabricBiomeProvider::getPresetFolderName),
                     Codec.LONG.fieldOf("seed").stable().forGetter(OTGFabricBiomeProvider::getSeed)
@@ -52,7 +53,7 @@ OTGFabricBiomeProvider extends BiomeSource implements ILayerSource, BiomeManager
     }
 
     @Override
-    protected Codec<? extends BiomeSource> codec() {
+    protected MapCodec<? extends BiomeSource> codec() {
         return CODEC;
     }
 

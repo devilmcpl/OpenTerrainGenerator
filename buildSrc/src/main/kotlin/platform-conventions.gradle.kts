@@ -25,7 +25,7 @@ tasks {
 
     shadowJar {
         // Specify dependencies to include in the shadowJar
-        dependencyFilter.apply {
+        dependencies {
             include(project(":common:common-annotation"))
             include(project(":common:common-util"))
             include(project(":common:common-customobject"))

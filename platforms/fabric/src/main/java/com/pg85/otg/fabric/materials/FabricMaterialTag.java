@@ -3,7 +3,7 @@ package com.pg85.otg.fabric.materials;
 import com.pg85.otg.util.materials.LocalMaterialTag;
 import lombok.Getter;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 
@@ -21,7 +21,7 @@ public class FabricMaterialTag extends LocalMaterialTag {
         ) {
             return null;
         }
-        TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, new ResourceLocation(tag));
+        TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, Identifier.parse(tag));
         return new FabricMaterialTag(tagKey, tag);
     }
 

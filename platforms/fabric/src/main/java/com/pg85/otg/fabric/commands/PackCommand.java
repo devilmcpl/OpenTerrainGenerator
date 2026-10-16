@@ -75,7 +75,7 @@ final class PackCommand
 		Path worldSaveFolder = level.getServer().getWorldPath(LevelResource.PLAYER_DATA_DIR).getParent();
 
 		ChunkAccess chunk = level.getChunk(0, 0);
-		OTGWorldInfo otgWorldInfo = new OTGWorldInfo(level.getMinBuildHeight(), level.getMaxBuildHeight());
+		OTGWorldInfo otgWorldInfo = new OTGWorldInfo(level.getMinY(), level.getMaxY() + 1);
 		FabricWorldGenRegion worldGenRegion = new FabricWorldGenRegion(
 			preset.getFolderName(),
 			OTG.getEngine().getPluginConfig(),

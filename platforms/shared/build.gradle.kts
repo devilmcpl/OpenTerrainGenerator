@@ -33,7 +33,7 @@ dependencies {
 
 tasks {
     shadowJar {
-        dependencyFilter.apply {
+        dependencies {
             include(project(":common:common-annotation"))
             include(project(":common:common-util"))
             include(project(":common:common-customobject"))
@@ -45,7 +45,7 @@ tasks {
         }
 
         exclude("architectury.common.json")
-        configurations = listOf(otg)
+        configurations.set(listOf(otg))
         archiveClassifier.set("deobf-all")
     }
 

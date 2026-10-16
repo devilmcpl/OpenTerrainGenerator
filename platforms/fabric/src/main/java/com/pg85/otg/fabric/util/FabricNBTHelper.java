@@ -33,7 +33,8 @@ public class FabricNBTHelper extends LocalNBTHelper {
             return null;
         }
 
-        NamedBinaryTag.Type listType = NamedBinaryTag.Type.values()[nmsListTag.getElementType()];
+        // Lists can hold mixed types now, so use the type of the first element
+        NamedBinaryTag.Type listType = NamedBinaryTag.Type.values()[nmsListTag.get(0).getId()];
         NamedBinaryTag listTag = new NamedBinaryTag(name, listType);
 
         // Add all child tags
@@ -90,7 +91,7 @@ public class FabricNBTHelper extends LocalNBTHelper {
         NamedBinaryTag compoundTag = new NamedBinaryTag(NamedBinaryTag.Type.TAG_Compound, name,
                 new NamedBinaryTag[]{new NamedBinaryTag(NamedBinaryTag.Type.TAG_End, null, null)});
 
-        Set<String> keys = nmsCompoundTag.getAllKeys();
+        Set<String> keys = nmsCompoundTag.keySet();
 
         // Add all child tags to the compound tag
         for (String key : keys)
@@ -143,15 +144,14 @@ public class FabricNBTHelper extends LocalNBTHelper {
 
     @Override
     public NamedBinaryTag getNBTFromLocation(LocalWorldGenRegion world, int x, int y, int z) {
-        BlockEntity blockEntity = ((FabricWorldGenRegion) world).getBlockEntity(new BlockPos(x, y, z));
-        
+        FabricWorldGenRegion fabricWorldGenRegion = (FabricWorldGenRegion) world;
+        BlockEntity blockEntity = fabricWorldGenRegion.getBlockEntity(new BlockPos(x, y, z));
+
         if (blockEntity == null) {
             return null;
         }
-        
-        CompoundTag nbt = new CompoundTag();
-        
-        blockEntity.load(nbt);
+
+        CompoundTag nbt = blockEntity.saveWithoutMetadata(fabricWorldGenRegion.getRegistryAccess());
         nbt.remove("x");
         nbt.remove("y");
         nbt.remove("z");
@@ -173,14 +173,14 @@ public class FabricNBTHelper extends LocalNBTHelper {
         NamedBinaryTag.Type type = NamedBinaryTag.Type.values()[inbt.getId()];
         // Cannot read this from a tag
         return switch (type) {
-            case TAG_Byte -> ((ByteTag) inbt).getAsByte();
-            case TAG_Short -> ((ShortTag) inbt).getAsShort();
-            case TAG_Int -> ((IntTag) inbt).getAsInt();
-            case TAG_Long -> ((LongTag) inbt).getAsLong();
-            case TAG_Float -> ((FloatTag) inbt).getAsFloat();
-            case TAG_Double -> ((DoubleTag) inbt).getAsDouble();
+            case TAG_Byte -> ((ByteTag) inbt).byteValue();
+            case TAG_Short -> ((ShortTag) inbt).shortValue();
+            case TAG_Int -> ((IntTag) inbt).intValue();
+            case TAG_Long -> ((LongTag) inbt).longValue();
+            case TAG_Float -> ((FloatTag) inbt).floatValue();
+            case TAG_Double -> ((DoubleTag) inbt).doubleValue();
             case TAG_Byte_Array -> ((ByteArrayTag) inbt).getAsByteArray();
-            case TAG_String -> inbt.getAsString();
+            case TAG_String -> ((StringTag) inbt).value();
             case TAG_Int_Array -> ((IntArrayTag) inbt).getAsIntArray();
             default -> throw new IllegalArgumentException(type + "doesn't have a simple value!");
         };

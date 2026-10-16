@@ -20,14 +20,12 @@ import com.pg85.otg.util.materials.LocalMaterials;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
-import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.ChunkPos;
@@ -35,14 +33,15 @@ import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.*;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Beardifier;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import net.minecraft.world.level.levelgen.blending.Blender;
-import net.minecraft.world.level.levelgen.structure.pools.JigsawJunction;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.TerrainAdjustment;
+import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
 import net.minecraft.world.level.levelgen.structure.structures.EndCityStructure;
 import net.minecraft.world.level.levelgen.structure.structures.JigsawStructure;
 import net.minecraft.world.level.levelgen.structure.structures.OceanMonumentStructure;
@@ -130,11 +129,18 @@ public class ShadowChunkGenerator {
             }
             synchronized (this.workerLock) {
                 //OTG.log(LogMarker.INFO, "Fetching chunks for async chunkgen");
-                for (ChunkAccess wgrChunk : ((WorldGenRegionAccessor) worldGenRegion).getCache()) {
+                List<ChunkAccess> wgrChunks = new ArrayList<>();
+                ((WorldGenRegionAccessor) worldGenRegion).getCache().forEach(chunkHolder -> {
+                    ChunkAccess wgrChunk = chunkHolder.getLatestChunk();
+                    if (wgrChunk != null) {
+                        wgrChunks.add(wgrChunk);
+                    }
+                });
+                for (ChunkAccess wgrChunk : wgrChunks) {
                     ChunkCoordinate wgrChunkCoord = ChunkCoordinate.fromChunkCoords(wgrChunk.getPos().x,
                                                                                     wgrChunk.getPos().z
                     );
-                    if (wgrChunk != chunk && !wgrChunk.getStatus().isOrAfter(ChunkStatus.NOISE)) {
+                    if (wgrChunk != chunk && !wgrChunk.getPersistedStatus().isOrAfter(ChunkStatus.NOISE)) {
                         if (!this.unloadedChunksCache.containsKey(wgrChunkCoord) && !this.chunksToLoad.contains(wgrChunkCoord)) {
                             boolean bFound = false;
                             for (ChunkCoordinate chunkCoordinate : this.chunksBeingLoaded) {
@@ -165,16 +171,11 @@ public class ShadowChunkGenerator {
             ChunkCoordinate chunkCoordinate
     ) {
 
-        Registry<Biome> biomeRegistry = getRegistry(serverLevel.registryAccess(), Registries.BIOME);
-        if (biomeRegistry == null) {
-            throw new RuntimeException("Could not get biome registry when loading chunk");
-        }
-
         ProtoChunk chunk = new ProtoChunk(
                 new ChunkPos(chunkCoordinate.getChunkX(), chunkCoordinate.getChunkZ()),
                 UpgradeData.EMPTY,
                 serverLevel,
-                biomeRegistry,
+                serverLevel.palettedContainerFactory(),
                 null
         );
 
@@ -201,10 +202,7 @@ public class ShadowChunkGenerator {
             NoiseChunk noiseChunk = NoiseChunk.forChunk(
                     chunk,
                     ctx.randomState(),
-                    new Beardifier(
-                            ObjectLists.<Beardifier.Rigid>emptyList().listIterator(),
-                            ObjectLists.<JigsawJunction>emptyList().listIterator()
-                    ),
+                    Beardifier.EMPTY,
                     ctx.runtimeSettings(),
                     ctx.fluidPicker(),
                     Blender.empty()
@@ -347,14 +345,14 @@ public class ShadowChunkGenerator {
             }
         }
 
-        Set<ResourceLocation> allStructures = structureRegistry.keySet();
+        List<Holder.Reference<Structure>> allStructures = structureRegistry.listElements().toList();
 
         for (ChunkCoordinate chunkToHandle : chunksToHandle) {
             chunk = new ProtoChunk(
                     new ChunkPos(chunkToHandle.getChunkX(), chunkToHandle.getChunkZ()),
                     UpgradeData.EMPTY,
                     serverWorld,
-                    biomeRegistry,
+                    serverWorld.palettedContainerFactory(),
                     null
             );
             chunkpos = chunk.getPos();
@@ -373,12 +371,8 @@ public class ShadowChunkGenerator {
 
             Holder<Biome> biomeHolder = biomeRegistry.wrapAsHolder(regBiome);
 
-            for (ResourceLocation resourceLocation : allStructures) {
-                Structure structure = structureRegistry.get(resourceLocation);
-
-                if (structure == null) {
-                    continue;
-                }
+            for (Holder.Reference<Structure> structureHolder : allStructures) {
+                Structure structure = structureHolder.value();
 
                 if (!structure.biomes().contains(biomeHolder)) {
                     continue;
@@ -394,7 +388,7 @@ public class ShadowChunkGenerator {
                     radius = 4;
                 }
 
-                if (hasStructureStart(structure, manager, chunkpos, noiseAffectingOnly)) {
+                if (hasStructureStart(structureHolder, serverWorld, manager, chunkpos, noiseAffectingOnly)) {
                     chunksHandled.put(chunkToHandle, radius);
                     if (radius >= distanceFromQuery) {
                         if (noiseAffectingOnly) {
@@ -425,7 +419,7 @@ public class ShadowChunkGenerator {
     }
 
     private static @Nullable <T> Registry<T> getRegistry(RegistryAccess registryAccess, ResourceKey<Registry<T>> resourceKey) {
-        Optional<Registry<T>> ops = registryAccess.registry(resourceKey);
+        Optional<Registry<T>> ops = registryAccess.lookup(resourceKey);
 
         if (ops.isEmpty()) {
             OTGLog.error("Could not get structure registry during shadow chunk gen");
@@ -462,8 +456,9 @@ public class ShadowChunkGenerator {
     }
 
     private static boolean hasStructureStart(
-            Structure structure, StructureManager manager, ChunkPos chunkPos, boolean noiseAffectingOnly
+            Holder<Structure> structureHolder, ServerLevel serverWorld, StructureManager manager, ChunkPos chunkPos, boolean noiseAffectingOnly
     ) {
+        Structure structure = structureHolder.value();
         TerrainAdjustment terrainAdjustment = structure.terrainAdaptation();
 
         if (noiseAffectingOnly && (terrainAdjustment == TerrainAdjustment.NONE || terrainAdjustment == TerrainAdjustment.BURY)) {
@@ -474,16 +469,23 @@ public class ShadowChunkGenerator {
             return false;
         }
 
-        return switch (manager.checkStructurePresence(chunkPos, structure, false)) {
-            case START_PRESENT -> true;
-            case START_NOT_PRESENT -> false;
-            case CHUNK_LOAD_NEEDED -> {
-                // Chunk data isn't loaded yet (common during pregeneration). Proceed with shadow
-                // gen rather than blocking BO4 lookahead — the occasional minor terrain mismatch
-                // near a vanilla noise-affecting structure is the acceptable tradeoff.
-                yield false;
+        // Structure presence is checked per placement now, same as vanilla's structure locating
+        for (StructurePlacement placement : serverWorld.getChunkSource().getGeneratorState().getPlacementsForStructure(structureHolder)) {
+            boolean startPresent = switch (manager.checkStructurePresence(chunkPos, structure, placement, false)) {
+                case START_PRESENT -> true;
+                case START_NOT_PRESENT -> false;
+                case CHUNK_LOAD_NEEDED -> {
+                    // Chunk data isn't loaded yet (common during pregeneration). Proceed with shadow
+                    // gen rather than blocking BO4 lookahead — the occasional minor terrain mismatch
+                    // near a vanilla noise-affecting structure is the acceptable tradeoff.
+                    yield false;
+                }
+            };
+            if (startPresent) {
+                return true;
             }
-        };
+        }
+        return false;
     }
 
     public void fillWorldGenChunkFromShadowChunk(ChunkAccess chunk, ChunkAccess cachedChunk) {

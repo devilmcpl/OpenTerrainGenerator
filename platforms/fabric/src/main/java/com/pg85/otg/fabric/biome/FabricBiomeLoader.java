@@ -24,7 +24,7 @@ public class FabricBiomeLoader {
 
         if (!BIOME_DATA_INITIALIZED) {
             // Should always be initialized, but better safe than sorry. Would rather have a sensical error message than nonsensical
-            throw new IllegalStateException("BiomeDataMixin not initialized");
+            throw new IllegalStateException("Placed feature and carver registries not initialized");
         }
         HolderGetter<PlacedFeature> featureHolder = PLACED_FEATURE_HOLDER;
         HolderGetter<ConfiguredWorldCarver<?>> carverHolder = CONFIGURED_CARVER_HOLDER;

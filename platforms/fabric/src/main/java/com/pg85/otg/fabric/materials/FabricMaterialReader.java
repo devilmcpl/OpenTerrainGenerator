@@ -11,14 +11,14 @@ import com.pg85.otg.util.logging.LogLevel;
 import com.pg85.otg.util.materials.LocalMaterialData;
 import com.pg85.otg.util.materials.LocalMaterialTag;
 import com.pg85.otg.util.minecraft.BlockNames;
-import net.minecraft.ResourceLocationException;
+import net.minecraft.IdentifierException;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.registries.VanillaRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -193,7 +193,7 @@ public class FabricMaterialReader implements IMaterialReader {
         {
             // This returns AIR if block is not found ><.
             // TODO: Is this still the case? -auth
-            Optional<Holder.Reference<Block>> result = blockLookup.get(ResourceKey.create(Registries.BLOCK, new ResourceLocation(blockNameCorrected)));
+            Optional<Holder.Reference<Block>> result = blockLookup.get(ResourceKey.create(Registries.BLOCK, Identifier.parse(blockNameCorrected)));
             block = result.map(Holder.Reference::value).orElse(null);
 
             if(block != null && (block != Blocks.AIR || blockNameCorrected.toLowerCase().endsWith("air")))
@@ -205,7 +205,7 @@ public class FabricMaterialReader implements IMaterialReader {
                 }
                 return FabricMaterialData.ofBlock(block, input);
             }
-        } catch(ResourceLocationException ignored) { }
+        } catch(IdentifierException ignored) { }
 
         // Try legacy name again, without data.
         blockState = FabricLegacyMaterials.fromLegacyBlockName(blockNameCorrected.replace("minecraft:", ""));

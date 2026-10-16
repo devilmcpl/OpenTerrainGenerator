@@ -17,13 +17,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Set;
 
 final class TpCommand {
 
@@ -95,7 +97,7 @@ final class TpCommand {
                 ServerPlayer player = src.getPlayer();
                 if (player != null) {
                     player.teleportTo(level, safeDest.getX() + 0.5, safeDest.getY(), safeDest.getZ() + 0.5,
-                        player.getYRot(), player.getXRot());
+                        Set.of(), player.getYRot(), player.getXRot(), true);
                     int dist = Mth.floor(Math.sqrt(origin.distSqr(safeDest)));
                     src.sendSuccess(() -> Component.literal(
                         "Teleported to \"" + biomeName + "\" at " +
@@ -121,7 +123,7 @@ final class TpCommand {
         if (!(settings instanceof BiomeConfig bc)) return null;
         if (bc.getRegistryKey() == null) return null;
         try {
-            ResourceLocation rl = new ResourceLocation(bc.getRegistryKey().toResourceLocationString());
+            Identifier rl = Identifier.parse(bc.getRegistryKey().toResourceLocationString());
             return ResourceKey.create(Registries.BIOME, rl);
         } catch (Exception e) {
             return null;

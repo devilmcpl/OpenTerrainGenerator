@@ -144,7 +144,7 @@ final class SettingsCommand {
             return 0;
         }
 
-        String registryName = biomeKey.get().location().toString();
+        String registryName = biomeKey.get().identifier().toString();
         OTGBiomeID otgBiomeID = gen.getPreset().getBiomeIDByRegistryName(registryName);
         if (otgBiomeID == null) {
             src.sendFailure(Component.literal("Current biome (" + registryName + ") is not an OTG biome."));

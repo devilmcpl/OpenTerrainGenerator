@@ -5,13 +5,14 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.Aquifer;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.DensityFunctions;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.NoiseRouter;
+import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
@@ -65,13 +66,23 @@ public final class OTGNoiseRouterFactory {
             long seed
     ) {
         HolderGetter<DensityFunction> functions =
-                registryAccess.registryOrThrow(Registries.DENSITY_FUNCTION).asLookup();
+                registryAccess.lookupOrThrow(Registries.DENSITY_FUNCTION);
         HolderGetter<NormalNoise.NoiseParameters> noises =
-                registryAccess.registryOrThrow(Registries.NOISE).asLookup();
+                registryAccess.lookupOrThrow(Registries.NOISE);
 
         DensityFunction otgTerrain = new OTGTerrainDensityFunction(internalGenerator, densityScale);
         DensityFunction depthProxy = new OTGDepthProxyFunction(internalGenerator, depthGradient);
         DensityFunction finalDensity = finalDensity(otgTerrain, depthProxy, functions, noises);
+
+        // The preliminary surface level is a block height now rather than a density, so search the column for the
+        // top surface of OTG terrain the same way NoiseRouterData.overworld() does for vanilla terrain
+        NoiseSettings noiseSettings = registeredSettings.noiseSettings();
+        DensityFunction preliminarySurfaceLevel = DensityFunctions.findTopSurface(
+                DensityFunctions.add(otgTerrain, DensityFunctions.constant(-0.390625)),
+                DensityFunctions.constant(noiseSettings.minY() + noiseSettings.height()),
+                noiseSettings.minY(),
+                noiseSettings.getCellHeight()
+        );
 
         NoiseRouter router = new NoiseRouter(
                 DensityFunctions.zero(), // barrierNoise
@@ -84,7 +95,7 @@ public final class OTGNoiseRouterFactory {
                 DensityFunctions.zero(), // erosion
                 DensityFunctions.zero(), // depth
                 DensityFunctions.zero(), // ridges
-                otgTerrain,              // initialDensityWithoutJaggedness (preliminary surface)
+                preliminarySurfaceLevel, // preliminarySurfaceLevel
                 finalDensity,
                 DensityFunctions.zero(), // veinToggle
                 DensityFunctions.zero(), // veinRidged
@@ -180,7 +191,7 @@ public final class OTGNoiseRouterFactory {
     // own router references.
     private static DensityFunction getFunction(HolderGetter<DensityFunction> functions, String name) {
         Holder<DensityFunction> holder = functions.getOrThrow(
-                ResourceKey.create(Registries.DENSITY_FUNCTION, new ResourceLocation(name))
+                ResourceKey.create(Registries.DENSITY_FUNCTION, Identifier.parse(name))
         );
         return new DensityFunctions.HolderHolder(holder);
     }
