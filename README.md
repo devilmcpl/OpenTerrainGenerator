@@ -20,6 +20,12 @@ We're always looking for people to contribute or collaborate with. For OTG 1.20,
 - To create release jars in the `build/distributions` folder, update the build version in build.gradle, then run `/gradlew`.
 - If you're having problems, make a sacrifice to the gradle gods and/or run `/gradlew clean` and then `/gradlew --refresh-dependencies`.
 
+### Paper
+
+- Put the OTG jar in the server's `plugins` folder.
+- To generate the server's worlds with an OTG preset, set `level-type=otg:<preset registry name>` (for instance `otg:default_preset`) in `server.properties` before the world is created.
+- Alternatively, set `generator: OpenTerrainGenerator:<preset>` for a world in `bukkit.yml`, or use `OpenTerrainGenerator:<preset>` as the generator in a world management plugin. Worlds set up this way keep the world height of their dimension instead of the preset's.
+
 ### IntelliJ Building Instructions
 
 - All you have to do is Open IntelliJ and import the project folder, make sure you Trust the gradle project, and IntelliJ will do the rest :)

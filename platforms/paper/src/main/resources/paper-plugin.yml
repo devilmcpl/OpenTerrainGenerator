@@ -1,0 +1,14 @@
+name: OpenTerrainGenerator
+version: '${version}'
+main: com.pg85.otg.paper.OTGPaperPlugin
+bootstrapper: com.pg85.otg.paper.OTGPaperBootstrap
+description: 'OTG: Generate anything!'
+authors: [Team OTG]
+website: https://github.com/PG85/OpenTerrainGenerator
+# OTG has to be enabled before worlds are loaded
+load: STARTUP
+api-version: '${minecraft_version}'
+permissions:
+  otg.cmd:
+    description: Allows using the /otg commands
+    default: op

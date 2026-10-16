@@ -75,6 +75,7 @@ session.lock
 /platforms/fabric/.architectury-transformer/
 /.architectury-transformer/
 /platforms/shared/run/
+/platforms/paper/run/
 
 # Filesystem dust
 Thumbs.db
