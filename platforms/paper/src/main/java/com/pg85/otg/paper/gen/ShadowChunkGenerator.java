@@ -207,7 +207,7 @@ public class ShadowChunkGenerator {
                     ctx.fluidPicker(),
                     Blender.empty()
             );
-            OTGNoiseCaveFiller.fill(noiseChunk, chunk, buffer, ctx.runtimeSettings());
+            OTGNoiseCaveFiller.fill(noiseChunk, chunk, buffer, ctx.runtimeSettings(), otgChunkGenerator.getBiomeConfigsBelowZero(chunkCoordinate));
             otgChunkGenerator.getInternalGenerator().doSurfaceAndGroundControlForChunk(otgWorldInfo, buffer, random);
         } else {
             ObjectList<JigsawStructureData> structures = new ObjectArrayList<>(10);
@@ -555,11 +555,13 @@ public class ShadowChunkGenerator {
         byte blockX = (byte) (x & 0xF);
         byte blockZ = (byte) (z & 0xF);
 
+        // Columns are indexed by y - floorY, so they start at MinY when the world extends below y 0.
+        int floorY = otgWorldInfo.generationFloorY();
         LocalMaterialData[] blocksInColumn = new LocalMaterialData[otgWorldInfo.getHeight()];
         BlockState blockInChunk;
 
         for (short y = 0; y < otgWorldInfo.getHeight(); y++) {
-            blockInChunk = chunk.getBlockState(new BlockPos(blockX, y, blockZ));
+            blockInChunk = chunk.getBlockState(new BlockPos(blockX, y + floorY, blockZ));
             blocksInColumn[y] = PaperMaterialData.ofBlockState(blockInChunk);
         }
 
@@ -575,7 +577,7 @@ public class ShadowChunkGenerator {
         LocalMaterialData[] blockColumn = getBlockColumnInUnloadedChunk(
                 serverLevel, otgChunkGenerator, otgWorldInfo, x, z
         );
-        return blockColumn[y];
+        return blockColumn[y - otgWorldInfo.generationFloorY()];
     }
 
     public int getHighestBlockYInUnloadedChunk(
@@ -584,6 +586,7 @@ public class ShadowChunkGenerator {
             boolean findSolid, boolean findLiquid, boolean ignoreLiquid, boolean ignoreSnow
     ) {
         int height = otgWorldInfo.minY() - 1;
+        int floorY = otgWorldInfo.generationFloorY();
 
         LocalMaterialData[] blockColumn = getBlockColumnInUnloadedChunk(serverLevel, otgChunkGenerator, otgWorldInfo, x,
                                                                         z
@@ -593,7 +596,7 @@ public class ShadowChunkGenerator {
         boolean isSolid;
 
         for (int y = otgWorldInfo.maxY(); y >= otgWorldInfo.minY(); y--) {
-            material = (PaperMaterialData) blockColumn[y];
+            material = (PaperMaterialData) blockColumn[y - floorY];
             isLiquid = material.isLiquid();
             isSolid = material.isSolid() || (!ignoreSnow && material.isMaterial(LocalMaterials.SNOW));
             if (!(isLiquid && ignoreLiquid)) {

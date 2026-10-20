@@ -25,6 +25,20 @@ public record OTGWorldInfo(int minY, int maxY) {
         return getInclusiveHeight() + 1;
     }
 
+    /**
+     * @return Whether the world extends below y 0, where OTG's terrain noise ends
+     */
+    public boolean extendsBelowZero() {
+        return minY < 0;
+    }
+
+    /**
+     * @return The lowest y OTG generates blocks at: minY when the world extends below y 0, otherwise 0
+     */
+    public int generationFloorY() {
+        return Math.min(0, minY);
+    }
+
     public int getXAboveMin(int offset) {
         return offset + minY;
     }

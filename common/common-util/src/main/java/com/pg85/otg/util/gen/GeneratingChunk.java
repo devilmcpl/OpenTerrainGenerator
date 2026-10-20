@@ -1,5 +1,7 @@
 package com.pg85.otg.util.gen;
 
+import com.pg85.otg.config.settings.biome.SurfaceSettings;
+import com.pg85.otg.config.settings.preset.BlockSettings;
 import com.pg85.otg.constants.Constants;
 import com.pg85.otg.util.ChunkCoordinate;
 import lombok.Getter;
@@ -93,4 +95,31 @@ public final class GeneratingChunk
 		}
 		return false;
 	} 
+
+	/**
+	 * Places the bottom bedrock layer for the part of a column below y 0,
+	 * which the surface generators don't reach. Does nothing (and draws no
+	 * random numbers) when the world doesn't extend below y 0.
+	 *
+	 * @param x X position, 0 <= x < {@value ChunkCoordinate#CHUNK_SIZE}.
+	 * @param z Z position, 0 <= z < {@value ChunkCoordinate#CHUNK_SIZE}.
+	 */
+	public void placeBedrockBelowZero(ChunkBuffer chunkBuffer, int x, int z, SurfaceSettings surfaceSettings)
+	{
+		if (!this.worldHeight.extendsBelowZero())
+		{
+			return;
+		}
+
+		BlockSettings blockSettings = surfaceSettings.getBlockSettings();
+		// Bedrock only goes up to MinY + 4, anything from y 0 up is left to the surface generators.
+		int topY = Math.min(-1, worldHeight.getXAboveMin(BEDROCK_LAYER_HEIGHT - 1));
+		for (int y = topY; y >= worldHeight.minY(); y--)
+		{
+			if (mustCreateBedrockAt(blockSettings.isFlatBedrock(), blockSettings.isDisableBedrock(), blockSettings.isCeilingBedrock(), y))
+			{
+				chunkBuffer.setBlock(x, y, z, surfaceSettings.getBedrockBlockReplaced(y));
+			}
+		}
+	}
 }

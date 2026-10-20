@@ -3,6 +3,7 @@ package com.pg85.otg.fabric.gen;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.pg85.otg.OTG;
+import com.pg85.otg.config.settings.biome.BiomeSettings;
 import com.pg85.otg.constants.Constants;
 import com.pg85.otg.constants.settings.structure.CustomStructureType;
 import com.pg85.otg.customobject.structures.CustomStructureCache;
@@ -396,7 +397,7 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
             NoiseChunk noiseChunk = chunkAccess.getOrCreateNoiseChunk(
                     c -> this.createNoiseChunk(c, structureManager, blender, randomState, levelAccessor.registryAccess())
             );
-            OTGNoiseCaveFiller.fill(noiseChunk, chunkAccess, buffer, ctx.runtimeSettings());
+            OTGNoiseCaveFiller.fill(noiseChunk, chunkAccess, buffer, ctx.runtimeSettings(), getBiomeConfigsBelowZero(chunkCoord));
             this.internalGenerator.doSurfaceAndGroundControlForChunk(otgWorldInfo, buffer, getRandomFromChunkCoord(chunkCoord));
             this.shadowChunkGenerator.setChunkGenerated(chunkCoord);
         } else {
@@ -433,6 +434,15 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
 
     public @NotNull Random getRandomFromChunkCoord(ChunkCoordinate chunkCoord) {
         return new Random(this.seed + chunkCoord.getChunkX()*341873128712L + chunkCoord.getChunkZ()*132897987541L);
+    }
+
+    // Biome configs for OTGNoiseCaveFiller, which uses them to place each biome's replaced stone
+    // below y 0. Null when the world doesn't extend below y 0, keeping the default block everywhere.
+    @Nullable BiomeSettings[] getBiomeConfigsBelowZero(ChunkCoordinate chunkCoord) {
+        if (!this.otgWorldInfo.extendsBelowZero()) {
+            return null;
+        }
+        return this.internalGenerator.getCachedBiomeProvider().getBiomeConfigsForChunk(chunkCoord);
     }
 
     @Override
@@ -476,6 +486,8 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
         int zProgress = Math.floorMod(z, 4);
         double xLerp = (double) xProgress / 4.0;
         double zLerp = (double) zProgress / 4.0;
+        // blockStates starts at the world's MinY when it's below 0, OTG's noise starts at y 0.
+        int floorY = this.otgWorldInfo.generationFloorY();
         // Create the noise data in a 2 * 2 * 32 grid for interpolation.
         double[][] noiseData = new double[4][this.internalGenerator.getNoiseSizeY() + 1];
 
@@ -518,9 +530,9 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
                 int y = (noiseY * 8) + pieceY;
 
                 BlockState state = this.getBlockState(density, y);
-                if (blockStates != null)
+                if (blockStates != null && y - floorY < blockStates.length)
                 {
-                    blockStates[y] = state;
+                    blockStates[y - floorY] = state;
                 }
 
                 // return y if it fails the check
@@ -531,7 +543,27 @@ public class OTGFabricChunkGenerator extends ChunkGenerator {
             }
         }
 
-        return 0;
+        if (floorY < 0)
+        {
+            // Below y 0 (MinY < 0), hold the y 0 density, like OTGTerrainDensityFunction and the
+            // legacy fill do. This is the density the loop above computed for y 0.
+            double bottomDensity = MathHelper.lerp3(xLerp, 0.0D, zLerp, noiseData[0][0], noiseData[2][0], noiseData[1][0], noiseData[3][0], noiseData[0][1], noiseData[2][1], noiseData[1][1], noiseData[3][1]);
+            for (int y = -1; y >= floorY; --y)
+            {
+                BlockState state = this.getBlockState(bottomDensity, y);
+                if (blockStates != null)
+                {
+                    blockStates[y - floorY] = state;
+                }
+
+                if (predicate != null && predicate.test(state))
+                {
+                    return y + 1;
+                }
+            }
+        }
+
+        return floorY;
     }
 
     // MC's NoiseChunkGenerator returns defaultBlock and defaultFluid here, so callers

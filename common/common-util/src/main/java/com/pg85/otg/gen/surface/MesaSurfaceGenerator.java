@@ -110,7 +110,7 @@ public class MesaSurfaceGenerator implements ISurfaceGenerator
 		}
 		//int l = 0; // TODO: Fix the mesa noise pattern (it's broken for vanilla too).
 
-		LocalMaterialData material = this.clayBands[(yInWorld + noise + 64) % 64];
+		LocalMaterialData material = this.clayBands[Math.floorMod(yInWorld + noise + 64, 64)];
 		if(material == this.hardClay)
 		{
 			return !this.hardClayIsReplaced ? this.hardClay : replacedBlocks.replaceBlock(yInWorld, this.hardClay);

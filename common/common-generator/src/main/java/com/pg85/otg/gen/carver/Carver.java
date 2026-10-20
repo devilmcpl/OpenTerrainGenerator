@@ -91,6 +91,8 @@ public abstract class Carver {
         double scaledY;
         BiomeSettings biomeConfig;
         MutableBoolean foundSurface;
+        // Same layout as vanilla's CarvingMask (y relative to MinY) when the world extends below y 0.
+        int maskFloorY = otgWorldInfo.generationFloorY();
         if (this.isRegionUncarvable(
                 chunkBuffer,
                 chunkX,
@@ -135,7 +137,8 @@ public abstract class Carver {
                                     currentY,
                                     currentZ,
                                     foundSurface,
-                                    biomeConfig
+                                    biomeConfig,
+                                    maskFloorY
                             );
                         }
                     }
@@ -155,10 +158,11 @@ public abstract class Carver {
             int y,
             int relativeZ,
             MutableBoolean foundSurface,
-            BiomeSettings biomeConfig
+            BiomeSettings biomeConfig,
+            int maskFloorY
     ) {
         SurfaceSettings surface = biomeConfig.getSurfaceSettings();
-        int i = relativeX | relativeZ << 4 | y << 8;
+        int i = relativeX | relativeZ << 4 | (y - maskFloorY) << 8;
         if (carvingMask.get(i)) {
             return false;
         }

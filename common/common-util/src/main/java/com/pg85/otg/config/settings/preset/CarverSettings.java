@@ -48,7 +48,7 @@ public class CarverSettings extends ConfigSection {
             "result of 5 to 6. This can be turned off by setting evenCaveDistribution (below) to true."
     );
     public static final Setting<Integer> CAVE_MIN_ALTITUDE = Settings.intSetting(
-            "CaveMinAltitude", 8, Constants.WORLD_DEPTH, Constants.WORLD_HEIGHT - 1,
+            "CaveMinAltitude", 8, Constants.WORLD_START_MIN_Y, Constants.WORLD_HEIGHT - 1,
             t -> ((CarverSettings) t).getCaveMinAltitude(),
             "Sets the minimum and maximum altitudes at which caves will be generated. These values are",
             "used in a randomizer that trends towards lower numbers so that caves become more frequent",
@@ -57,7 +57,7 @@ public class CarverSettings extends ConfigSection {
             "density of caves at all altitudes."
     );
     public static final Setting<Integer> CAVE_MAX_ALTITUDE = Settings.intSetting(
-            "CaveMaxAltitude", 128, Constants.WORLD_DEPTH, Constants.WORLD_HEIGHT - 1,
+            "CaveMaxAltitude", 128, Constants.WORLD_START_MIN_Y, Constants.WORLD_HEIGHT - 1,
             t -> ((CarverSettings) t).getCaveMaxAltitude(),
             "See " + CAVE_MIN_ALTITUDE
     );
@@ -100,11 +100,11 @@ public class CarverSettings extends ConfigSection {
             t -> ((CarverSettings) t).getRavineRarity()
     );
     public static final Setting<Integer> RAVINE_MIN_ALTITUDE = Settings.intSetting(
-            "RavineMinAltitude", 20, Constants.WORLD_DEPTH, Constants.WORLD_HEIGHT - 1,
+            "RavineMinAltitude", 20, Constants.WORLD_START_MIN_Y, Constants.WORLD_HEIGHT - 1,
             t -> ((CarverSettings) t).getRavineMinAltitude()
     );
     public static final Setting<Integer> RAVINE_MAX_ALTITUDE = Settings.intSetting(
-            "RavineMaxAltitude", 68, Constants.WORLD_DEPTH, Constants.WORLD_HEIGHT - 1,
+            "RavineMaxAltitude", 68, Constants.WORLD_START_MIN_Y, Constants.WORLD_HEIGHT - 1,
             t -> ((CarverSettings) t).getRavineMaxAltitude()
     );
     public static final Setting<Integer> RAVINE_MIN_LENGTH = Settings.intSetting(
@@ -167,13 +167,15 @@ public class CarverSettings extends ConfigSection {
 
     public static CarverSettings getCarverSettings(SettingsMap reader, TerrainSettings terrainSettings) {
         CarverSettingsBuilder carverSettingsBuilder = builder();
+        // Altitudes can only go below y 0 when the world does, MinY >= 0 keeps the old floor of 0.
+        int altitudeFloorY = Math.min(0, terrainSettings.getMinY());
 
         carverSettingsBuilder.cavesEnabled(reader.getSetting(CAVES_ENABLED));
         carverSettingsBuilder.caveFrequency(reader.getSetting(CAVE_FREQUENCY));
         carverSettingsBuilder.caveRarity(reader.getSetting(CAVE_RARITY));
         carverSettingsBuilder.evenCaveDistribution(reader.getSetting(EVEN_CAVE_DISTRIBUTION));
-        carverSettingsBuilder.caveMinAltitude(reader.getSetting(CAVE_MIN_ALTITUDE));
-        carverSettingsBuilder.caveMaxAltitude(reader.getSetting(CAVE_MAX_ALTITUDE));
+        carverSettingsBuilder.caveMinAltitude(Math.max(reader.getSetting(CAVE_MIN_ALTITUDE), altitudeFloorY));
+        carverSettingsBuilder.caveMaxAltitude(Math.max(reader.getSetting(CAVE_MAX_ALTITUDE), altitudeFloorY));
         carverSettingsBuilder.caveSystemFrequency(reader.getSetting(CAVE_SYSTEM_FREQUENCY));
         carverSettingsBuilder.individualCaveRarity(reader.getSetting(INDIVIDUAL_CAVE_RARITY));
         carverSettingsBuilder.caveSystemPocketChance(reader.getSetting(CAVE_SYSTEM_POCKET_CHANCE));
@@ -189,8 +191,8 @@ public class CarverSettings extends ConfigSection {
         carverSettingsBuilder.ravineMinLength(reader.getSetting(RAVINE_MIN_LENGTH));
         carverSettingsBuilder.ravineMaxLength(reader.getSetting(RAVINE_MAX_LENGTH));
         carverSettingsBuilder.ravineDepth(reader.getSetting(RAVINE_DEPTH));
-        carverSettingsBuilder.ravineMinAltitude(reader.getSetting(RAVINE_MIN_ALTITUDE));
-        carverSettingsBuilder.ravineMaxAltitude(reader.getSetting(RAVINE_MAX_ALTITUDE));
+        carverSettingsBuilder.ravineMinAltitude(Math.max(reader.getSetting(RAVINE_MIN_ALTITUDE), altitudeFloorY));
+        carverSettingsBuilder.ravineMaxAltitude(Math.max(reader.getSetting(RAVINE_MAX_ALTITUDE), altitudeFloorY));
         return carverSettingsBuilder.fixSettings().build();
     }
 

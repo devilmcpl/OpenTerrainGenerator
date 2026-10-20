@@ -1,5 +1,7 @@
 package com.pg85.otg.fabric.gen.noise;
 
+import com.pg85.otg.config.settings.biome.BiomeSettings;
+import com.pg85.otg.fabric.materials.FabricMaterialData;
 import com.pg85.otg.fabric.mixin.NoiseChunkAccessor;
 import com.pg85.otg.util.gen.ChunkBuffer;
 import net.minecraft.core.BlockPos;
@@ -22,6 +24,8 @@ import net.minecraft.world.level.ChunkPos;
  * - Runs synchronously (no section acquire/release; the caller doesn't hop executors).
  * - Records the highest placed block per column on the ChunkBuffer, which OTG's surface and
  *   ground control needs.
+ * - Below y 0 (worlds with MinY < 0), places each biome's stone with ReplacedBlocks applied instead
+ *   of the default block, since OTG's surface and ground control doesn't reach below y 0.
  * - No debug hooks.
  */
 public final class OTGNoiseCaveFiller {
@@ -32,7 +36,9 @@ public final class OTGNoiseCaveFiller {
             NoiseChunk noiseChunk,
             ChunkAccess chunkAccess,
             ChunkBuffer buffer,
-            NoiseGeneratorSettings settings
+            NoiseGeneratorSettings settings,
+            // Per column (x * 16 + z), only passed when the world extends below y 0, otherwise null.
+            BiomeSettings[] biomeConfigs
     ) {
         NoiseSettings noiseSettings = settings.noiseSettings().clampToHeightAccessor(chunkAccess.getHeightAccessorForGeneration());
         int cellHeight = noiseSettings.getCellHeight();
@@ -86,7 +92,12 @@ public final class OTGNoiseCaveFiller {
 
                                 BlockState state = ((NoiseChunkAccessor) noiseChunk).callGetInterpolatedState();
                                 if (state == null) {
-                                    state = settings.defaultBlock();
+                                    if (biomeConfigs != null && blockY < 0) {
+                                        state = ((FabricMaterialData) biomeConfigs[localX * 16 + localZ].getSurfaceSettings()
+                                                .getStoneBlockReplaced(blockY)).getState();
+                                    } else {
+                                        state = settings.defaultBlock();
+                                    }
                                 }
                                 if (state.isAir()) {
                                     continue;

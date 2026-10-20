@@ -3,6 +3,7 @@ package com.pg85.otg.gen;
 import com.pg85.otg.OTG;
 import com.pg85.otg.config.settings.biome.BiomeSettings;
 import com.pg85.otg.config.settings.biome.BiomeTerrainSettings;
+import com.pg85.otg.config.settings.biome.SurfaceSettings;
 import com.pg85.otg.config.settings.preset.TerrainSettings;
 import com.pg85.otg.constants.Constants;
 import com.pg85.otg.gen.biome.CachedBiomeProvider;
@@ -487,6 +488,17 @@ public class OTGChunkGenerator implements ISurfaceGeneratorNoiseProvider {
                                     );
                                     buffer.setHighestBlockForColumn(pieceX + noiseX * 4, noiseZ * 4 + pieceZ, realY);
                                 }
+                                if (realY == 0 && worldHeight.extendsBelowZero()) {
+                                    fillBelowZero(
+                                            buffer,
+                                            localX,
+                                            localZ,
+                                            density > 0.0,
+                                            biomeConfig,
+                                            waterLevel[localX * Constants.CHUNK_SIZE + localZ],
+                                            worldHeight.generationFloorY()
+                                    );
+                                }
                             }
                         }
                     }
@@ -509,6 +521,31 @@ public class OTGChunkGenerator implements ISurfaceGeneratorNoiseProvider {
                     chunkCoord.getBlockZ() + DecorationArea.DECORATION_OFFSET,
                     System.currentTimeMillis() - startTime
             );
+        }
+    }
+
+    /**
+     * Fills a column from y -1 down to floorY, for worlds with MinY < 0. OTG's terrain noise
+     * starts at y 0, so the y 0 density is held below it, the same way OTGTerrainDensityFunction
+     * holds the bottom noise value for the vanilla noise cave path. Water uses the same water
+     * level rule as above y 0, so it only goes below 0 where the water levels themselves are negative.
+     */
+    private static void fillBelowZero(
+            ChunkBuffer buffer,
+            int localX,
+            int localZ,
+            boolean solid,
+            BiomeSettings biomeConfig,
+            int waterLevelMax,
+            int floorY
+    ) {
+        SurfaceSettings surfaceSettings = biomeConfig.getSurfaceSettings();
+        for (int y = -1; y >= floorY; --y) {
+            if (solid) {
+                buffer.setBlock(localX, y, localZ, surfaceSettings.getStoneBlockReplaced(y));
+            } else if (y < waterLevelMax && y > surfaceSettings.getWaterLevelMin()) {
+                buffer.setBlock(localX, y, localZ, surfaceSettings.getWaterBlockReplaced(y));
+            }
         }
     }
 
@@ -625,6 +662,8 @@ public class OTGChunkGenerator implements ISurfaceGeneratorNoiseProvider {
                         biome
                 )
                 ;
+                // Surface generators stop at y 0, so place bedrock below it here (no-op for MinY >= 0).
+                generatingChunk.placeBedrockBelowZero(chunkBuffer, x, z, biome.getBiomeSettings().getSurfaceSettings());
             }
         }
     }
