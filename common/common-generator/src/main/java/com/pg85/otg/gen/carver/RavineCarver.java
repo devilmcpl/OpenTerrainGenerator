@@ -49,7 +49,11 @@ public class RavineCarver extends Carver
 		// int branchingFactor = (this.getBranchFactor() * 2 - 1) * 16;		
 		// int branchCount = branchingFactor - random.nextInt(branchingFactor / 4);
 		int branchCount = RandomHelper.numberInRange(random, this.carverSettings.getRavineMinLength(), this.carverSettings.getRavineMaxLength());
-		branchCount = branchCount - random.nextInt(branchCount / 4);		
+		// Ravines shorter than 4 would make nextInt(0) throw and fail the whole chunk.
+		if (branchCount >= 4)
+		{
+			branchCount = branchCount - random.nextInt(branchCount / 4);
+		}
 		double yawPitchRatio = carverSettings.getRavineDepth();
 
 		this.carveRavine(
